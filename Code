@@ -1,0 +1,106 @@
+import numpy as np
+import math
+import pandas as pd
+import matplotlib.pyplot as plt
+import scipy
+from scipy.stats import chi2, norm, chisquare
+
+# Считывание данных
+data = [167., 183., 169., 167., 162., 167., 170., 167., 155., 170., 165.,
+       170., 161., 163., 170., 172., 160., 163., 168., 170., 166., 162.,
+       163., 164., 164., 168., 163., 168., 163., 168., 158., 165., 163.,
+       158., 166., 168., 170., 160., 160., 172., 168., 166., 163., 160.,
+       164., 164., 164., 158., 160., 170., 165., 156., 168., 164., 161.,
+       166., 160., 173., 170., 164., 165., 168., 167., 168., 168., 160.,
+       178., 163., 162., 162., 154., 159., 164., 164., 152., 164., 164.,
+       160., 162., 164., 159., 170., 164., 167., 164., 155., 154., 160.,
+       168., 170., 173., 165., 164., 170., 168., 170., 164., 164., 174.,
+       160., 160., 164., 159., 165., 165., 170., 158., 165., 166., 166.,
+       165., 158., 165., 158., 167., 168., 157., 166., 165., 161., 170.,
+       158., 160., 163., 164.]
+
+# Количество интервалов
+num_intervals = 9
+
+df = pd.DataFrame(data, columns=['Values'])
+
+# Разделение данных на интервалы
+interval_width = (max(data) - min(data)) / num_intervals
+intervals = [math.floor(min(data) + i * interval_width) for i in range(num_intervals + 1)]
+
+# Группировка данных по интервалам
+df['Interval'] = pd.cut(df['Values'], bins=intervals)
+
+# Подсчет количества значений в каждом интервале
+interval_counts = df['Interval'].value_counts().sort_index()
+mean_points = [min(data) + (1/2 + i)*interval_width for i in range(num_intervals)]
+
+# Визуализация гистограммы
+plt.figure(figsize=(12,8))
+plt.bar(interval_counts.index.astype(str), interval_counts.values)
+plt.plot(interval_counts.index.astype(str), interval_counts.values, marker='o', c = 'r')
+plt.xlabel('Intervals')
+plt.ylabel('Frequency')
+plt.title('Distribution of Values in Intervals')
+plt.grid(True)
+plt.show()
+
+# Вычисление выборочного среднего (несмещенная оценка математического ожидания)
+mean = sum(data) / len(data)
+
+# Вычисление выборочной дисперсии (несмещенная оценка дисперсии)
+variance = sum((data - mean)**2) / (len(data) - 1)
+
+print("Несмещенная оценка математического ожидания:", mean)
+print("Несмещенная оценка дисперсии:", variance)
+
+# Оценка параметров методом моментов для нормального распределения
+# Математическое ожидание равно выборочному среднему
+estimated_mu = mean
+
+# Дисперсия равна выборочной дисперсии
+estimated_sigma_squared = variance
+
+# Вычисление оценки стандартного отклонения
+estimated_sigma = np.sqrt(estimated_sigma_squared)
+
+print("Точечная оценка для mu (математического ожидания):", estimated_mu)
+print("Точечная оценка для sigma (стандартного отклонения):", estimated_sigma)
+
+
+# Определяем параметры распределения
+# (В предположении нормального распределения.
+# Тогда у нас параметры не зависят от выбранного метода. Удобно)
+sigma = np.sqrt(variance)
+print(f'Параметры распределения: a = {mean}, sigma = {sigma}')
+
+# Доверительный интервал для математического ожидания при известной дисперсии
+alpha = 0.1  # Уровень значимости (1 - надежность)
+z_alpha_2 = 1.645  # Для alpha = 0.1
+
+std_error_mean = np.sqrt(variance / len(data))
+confidence_interval_mean = (mean - z_alpha_2 * std_error_mean, mean + z_alpha_2 * std_error_mean)
+
+# Доверительный интервал для дисперсии
+chi2_alpha_2 = chi2.ppf(alpha / 2, df= len(data) - 1)
+chi2_1_minus_alpha_2 = chi2.ppf(1 - alpha / 2, df = len(data)  - 1)
+
+confidence_interval_variance = ((len(data)  - 1) * variance / chi2_1_minus_alpha_2, (len(data)  - 1) * variance / chi2_alpha_2)
+
+print("Доверительный интервал для математического ожидания:", confidence_interval_mean)
+print("Доверительный интервал для дисперсии:", confidence_interval_variance)
+
+# Проверка нормальности распределения с помощью критерия Пирсона
+chi_stat, p_value = normaltest(data)
+
+alpha = 0.05  # Уровень значимости
+
+critical_value = chi2.ppf(1 - alpha, df=len(data))
+
+print("Статистика хи-квадрат:", chi_stat)
+print("p-value:", p_value)
+
+if chi_stat > critical_value:
+    print("Отвергаем нулевую гипотезу: данные не имеют нормальное распределение")
+else:
+    print("Не отвергаем нулевую гипотезу: данные имеют нормальное распределение")
